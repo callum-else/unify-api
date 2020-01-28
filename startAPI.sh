@@ -1,1 +1,0 @@
-gunicorn -w 2 -b 0.0.0.0:3828 --certfile=/etc/letsencrypt/live/unifyapp.xyz/fullchain.pem --keyfile=/etc/letsencrypt/live/unifyapp.xyz/privkey.pem unify:api
