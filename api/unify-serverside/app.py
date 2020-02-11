@@ -1,5 +1,5 @@
 import falcon
-from .modules import test_db_connection
+from .modules import DBConnectionTest
 
 api = falcon.API()
-api.add_route('/test', test_db_connection())
+api.add_route('/test-db', DBConnectionTest())
