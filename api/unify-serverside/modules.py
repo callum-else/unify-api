@@ -4,9 +4,9 @@ import pymysql
 from .utility import db_connect
 
 class DBConnectionTest:
-"""
-Class for testing the connection to the Database from the scripts.
-"""
+    """
+        Class for testing the connection to the Database from the scripts.
+    """
 
     def on_get(self, req, resp):
 
