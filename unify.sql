@@ -26,11 +26,13 @@ CREATE TABLE `userfriends` (
 
 CREATE TABLE `usermessages` (
   `User_ID` varchar(255) NOT NULL,
+  `Recipient_ID` varchar(255) NOT NULL,
   `Message_ID` varchar(255) NOT NULL,
   `Message` text NOT NULL,
   `Sent_DateTime` datetime NOT NULL,
   PRIMARY KEY (`Message_ID`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`)
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`),
+  FOREIGN KEY (`Recipient_ID`) REFERENCES `users` (`User_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `usertags` (

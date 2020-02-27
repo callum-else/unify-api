@@ -26,7 +26,11 @@ class UserModule:
         pass
 
     def on_post(self, req, resp, user_id):
-        pass
+        if req.context.get('db_session'):
+            if 'user' in req.body:
+                pass
+
+            
 
     def on_put(self, req, resp, user_id):
         pass

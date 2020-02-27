@@ -1,0 +1,16 @@
+######################
+NEEDED LIBS:
+######################
+falcon
+falcon_autocrud
+sqlalchemy
+pymysql
+
+######################
+REQUIRED ACTIONS
+######################
+
+falcon_autocrud is broken, requires an edit to middleware.py, change:
+    process_response(req, resp, resource)
+to:
+    process_response(req, resp, resource, req_succeeded)
