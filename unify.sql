@@ -18,8 +18,8 @@ CREATE TABLE `userfriends` (
   `User_ID` varchar(255) NOT NULL,
   `Friend_ID` varchar(255) NOT NULL,
   PRIMARY KEY (`User_ID`, `Friend_ID`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`),
-  FOREIGN KEY (`Friend_ID`) REFERENCES `users` (`User_ID`),
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`Friend_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
   UNIQUE `Unique_Friendships` (`User_ID`, `Friend_ID`),
   INDEX `User_ID` (`User_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
@@ -31,15 +31,15 @@ CREATE TABLE `usermessages` (
   `Message` text NOT NULL,
   `Sent_DateTime` datetime NOT NULL,
   PRIMARY KEY (`Message_ID`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`),
-  FOREIGN KEY (`Recipient_ID`) REFERENCES `users` (`User_ID`)
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`Recipient_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `usertags` (
   `User_ID` varchar(255) NOT NULL,
   `User_Tag` varchar(255) NOT NULL,
   PRIMARY KEY (`User_ID`, `User_Tag`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`)
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `events` (
@@ -57,6 +57,6 @@ CREATE TABLE `eventsusers` (
   `Event_ID` varchar(255) NOT NULL,
   `User_ID` varchar(255) NOT NULL,
   PRIMARY KEY (`Event_ID`, `User_ID`),
-  FOREIGN KEY (`Event_ID`) REFERENCES `events` (`Event_ID`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`)
+  FOREIGN KEY (`Event_ID`) REFERENCES `events` (`Event_ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

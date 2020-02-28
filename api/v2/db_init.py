@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy import create_engine, UniqueConstraint, Table, Column, String, ForeignKey
 
 from falcon_autocrud.resource import SingleResource, CollectionResource
@@ -44,25 +44,33 @@ class UserTags(Base):
 class Events(Base):
     __tablename__ = 'events'
     __table_args__ = {'autoload':True, 'extend_existing':True}
-    attendees = relationship('EventUsers')
+    attendees = relationship('EventUsers', cascade='all, delete-orphan')
 
 class Users(Base):
     __tablename__ = 'users'
     User_ID = Column(String(255), primary_key=True)
     __table_args__ = {'autoload':True, 'extend_existing':True}
 
-    tags = relationship('UserTags', backref='Users')
-    events = relationship('EventUsers', backref='Users')
+    tags = relationship('UserTags', cascade='all, delete-orphan', backref='Users')
+    events = relationship('EventUsers', cascade='all, delete-orphan',  backref='Users')
     friends = relationship('Users', secondary='userfriends', 
                             primaryjoin=User_ID==user_friends.c.User_ID, 
-                            secondaryjoin=User_ID==user_friends.c.Friend_ID)
-    messages = relationship('Messages', backref='Users')
+                            secondaryjoin=User_ID==user_friends.c.Friend_ID,
+                            single_parent=True,
+                            cascade='all')
 
 ###########################################################
 
 class UserResource(SingleResource):
     model = Users
-    response_fields = ['First_Name', 'Last_Name', 'Profile_Picture', 'Twitter_Link', 'Instagram_Link', 'Description']
+    response_fields = ['First_Name', 'Last_Name', 'Profile_Picture', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
+
+class UserCollectionResource(CollectionResource):
+    model = Users
+    methods = ['POST', 'PATCH']
+
+    def before_post(self, req, resp, db_session, resource, *args, **kwargs):
+        print(dir(resource))
 
 class EventResource(SingleResource):
     model = Events
