@@ -5,6 +5,7 @@ falcon
 falcon_autocrud
 sqlalchemy
 pymysql
+requests
 
 ######################
 REQUIRED ACTIONS
