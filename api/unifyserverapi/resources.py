@@ -6,6 +6,9 @@ class UserResource(SingleResource):
     model = Users
     response_fields = ['First_Name', 'Last_Name', 'Profile_Picture', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
 
+    def before_put(self, req, resp, db_session, resource, *args, **kwargs):
+        pass
+
 class UserCollectionResource(CollectionResource):
     model = Users
     methods = ['POST', 'PATCH']

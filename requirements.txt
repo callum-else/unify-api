@@ -1,11 +1,13 @@
 ######################
 NEEDED LIBS:
 ######################
-falcon
-falcon_autocrud
-sqlalchemy
-pymysql
-requests
+falcon                  # Core Web API
+falcon-auth             # Falcon user authentication middleware
+falcon-autocrud         # Falcon CRUD DB interaction handler using SQLAlchemy
+falcon-require-https    # Falcon HTTPS validator
+pems                    # Importing PEM certificates
+requests                # Unit Testing request simulation
+sqlalchemy              # DB ORM handler.
 
 ######################
 REQUIRED ACTIONS
