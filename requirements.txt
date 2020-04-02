@@ -14,6 +14,13 @@ REQUIRED ACTIONS
 ######################
 
 falcon_autocrud is broken, requires an edit to middleware.py, change:
-    process_response(req, resp, resource)
+    process_response(self, req, resp, resource)
 to:
-    process_response(req, resp, resource, req_succeeded)
+    process_response(self, req, resp, resource, req_succeeded)
+
+######################
+REQUIRED ROUTE DATA
+######################
+
+/user/? GET:
+    - 

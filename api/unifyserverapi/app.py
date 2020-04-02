@@ -1,32 +1,31 @@
+
+######## FALCON SETUP ########
+
+# All falcon core and layer relevant imports
 import falcon
 from falcon_autocrud.middleware import Middleware
-from falcon_auth import FalconAuthMiddleware, JWTAuthBackend
+from falcon_auth import FalconAuthMiddleware
 from falcon_require_https import RequireHTTPS
-from pem import parse_file
 
-from .modules import DBConnectionTest
+# Relative imports for developed functions.
 
-from .db_init import engine, Session
-from .resources import UserResource, UserCollectionResource, EventResource, EventCollectionResource
-
-# Setup for Authentication Middleware
-# Rewrite to follow JWT user loader function requirements.
-user_loader = lambda payload : payload
-# cert = parse_file("")
+# Custom authentication backend.
+from .authentication import auth_backend
+from .db_init import engine, Session, user_loader
+from .resources import UserResource, UserCreationResource, UserLoginResource, UserVerificationResource, EventResource, EventCollectionResource
 
 # Falcon API initialisation, provided with Falcon middleware from imported modules.
 api = falcon.API(middleware=[
     # RequireHTTPS(),
-    Middleware(),
-    FalconAuthMiddleware(JWTAuthBackend(user_loader, 'secret'))
+    FalconAuthMiddleware(auth_backend),
+    Middleware()
 ])
 
-# ============ Test Routes ============
-api.add_route('/test-db', DBConnectionTest())
-
 # ============ User Routes ============
-api.add_route('/user/create/{User_ID}', UserCollectionResource(engine))
+api.add_route('/user/create', UserCreationResource(engine))
+api.add_route('/user/{User_ID}/verify', UserVerificationResource(engine))
 api.add_route('/user/{User_ID}', UserResource(engine))
+api.add_route('/login', UserLoginResource())
 
 # ============ Event Routes ===========
 api.add_route('/event/create/{Event_ID}', EventCollectionResource(engine))
