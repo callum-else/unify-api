@@ -7,6 +7,8 @@ CREATE TABLE `users` (
   `Password` varchar(64) NOT NULL,
   `Twitter_Link` varchar(255) DEFAULT NULL,
   `Instagram_Link` varchar(255) DEFAULT NULL,
+  `Spotify_Link` varchar(255) DEFAULT NULL,
+  `LinkedIn_Link` varchar(255) DEFAULT NULL,
   `Description` mediumtext DEFAULT NULL,
   `Verification_Code` varchar(6) DEFAULT NULL,
   `User_Verified` boolean NOT NULL DEFAULT FALSE,
