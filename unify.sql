@@ -1,3 +1,12 @@
+DROP TABLE IF EXISTS userpictures;
+DROP TABLE IF EXISTS userfriends;
+DROP TABLE IF EXISTS usertags;
+DROP TABLE IF EXISTS reportedusers;
+DROP TABLE IF EXISTS eventsusers;
+DROP TABLE IF EXISTS reportedevents;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS users;
+
 CREATE TABLE `users` (
   `User_ID` int NOT NULL AUTO_INCREMENT,
   `Email` varchar(255) NOT NULL,
@@ -12,6 +21,8 @@ CREATE TABLE `users` (
   `Description` mediumtext DEFAULT NULL,
   `Verification_Code` varchar(6) DEFAULT NULL,
   `User_Verified` boolean NOT NULL DEFAULT FALSE,
+  `Password_Code` varchar(6) DEFAULT NULL,
+  `Password_Changed` boolean NOT NULL DEFAULT FALSE,
   `User_Created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Last_Login` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`User_ID`)
@@ -46,10 +57,10 @@ CREATE TABLE `events` (
   `Event_ID` int NOT NULL AUTO_INCREMENT,
   `User_ID` int NOT NULL,
   `Name` varchar(30) NOT NULL,
-  `Description` text NOT NULL,
-  `Event_Picture` varchar(255) DEFAULT NULL,
+  `Description` text DEFAULT NULL,
+  `Picture` varchar(255) DEFAULT NULL,
   `DateTime` datetime NOT NULL,
-  `Event_Location` varchar(255) NOT NULL,
+  `Location` varchar(255) NOT NULL,
   PRIMARY KEY (`Event_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

@@ -2,7 +2,7 @@
 ######## FALCON-AUTOCRUD RESOURCE CREATION ########
 
 # Relative resource imports.
-from .db_init import Users, Events, user_loader, Session
+from .db_init import Users, Events, UserTags, user_loader, Session
 from .authentication import auth_backend, generate_verification_code, send_verification_email, check_valid_email
 
 # Falcon resource imports.
@@ -15,7 +15,7 @@ from jwt import decode
 # Single retrieval resource for editing, deleting and getting data from user profiles. 
 class UserResource(SingleResource):
     model = Users       # Based off the 'Users' table in the db.
-    response_fields = ['First_Name', 'Last_Name', 'Profile_Picture', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
+    response_fields = ['User_ID', 'First_Name', 'Last_Name', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
 
 # Single patching resource for account verification.
 class UserVerificationResource(SingleResource):
@@ -28,15 +28,20 @@ class UserVerificationResource(SingleResource):
 
         # Comparing the client-sent verif code with the saved user verif code.
         # Sets the user to verified if they are the same, raises a Falcon Bad Request if not.
-        if resource.Verification_Code == str(req.context.user.Verification_Code):
-            resource.User_Verified = True
+        if getattr(resource.Verification_Code) is not None:
+            if resource.Verification_Code == str(req.context.user.Verification_Code):
+                resource.User_Verified = True
+            else:
+                raise HTTPBadRequest("Invalid Verification Code", "Provided code does not match the required user verification code.")
         else:
-            raise HTTPBadRequest("Invalid Verification Code", "Provided code does not match the required user verification code.")
+            raise HTTPBadRequest("No Verification Code", "No user verification code was sent, but it is required.")
 
 # Collection posting resource for uploading profiles.
 class UserCreationResource(CollectionResource):
     model = Users
     methods = ['POST']
+
+    response_fields = ['User_ID', 'First_Name', 'Last_Name', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
 
     # No authentication needed for profile creation.
     auth = {
@@ -47,7 +52,10 @@ class UserCreationResource(CollectionResource):
         # If the user email is valid, set them a verif code.
         # If not, raise a Falcon Unauthorized error.
         if check_valid_email(resource.Email):
-            resource.Verification_Code = generate_verification_code()
+            if Session().query(Users).filter_by(Email=resource.Email).scalar() is None:
+                resource.Verification_Code = generate_verification_code()
+            else:
+                raise HTTPBadRequest("Email already exists", "A user already exists with this email.")
         else:
             raise HTTPUnauthorized("Not an Acedemic Email", "Provided email address is not an acedemic email.")
 
@@ -56,7 +64,7 @@ class UserCreationResource(CollectionResource):
         send_verification_email(new.Email, new.First_Name, new.Verification_Code)
         # JWT RETURNED TO USER for user request authentication.
         req.context['result']['access_token'] = auth_backend.get_auth_token({'User_ID':new.User_ID})
-
+        
 # Custom built login resource.
 class UserLoginResource:
     """
@@ -68,7 +76,7 @@ class UserLoginResource:
     """
 
     # Information to return about the user.
-    response_fields = ['User_ID', 'First_Name', 'Last_Name', 'Profile_Picture', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
+    response_fields = ['User_ID', 'First_Name', 'Last_Name', 'Twitter_Link', 'Instagram_Link', 'Description', 'tags']
     
     # No authentication needed for user login.
     auth = {

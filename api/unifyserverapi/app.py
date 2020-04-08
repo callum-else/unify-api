@@ -28,5 +28,5 @@ api.add_route('/user/{User_ID}', UserResource(engine))
 api.add_route('/login', UserLoginResource())
 
 # ============ Event Routes ===========
-api.add_route('/event/create/{Event_ID}', EventCollectionResource(engine))
-api.add_route('/event/{Event_ID}', EventResource(engine))
+api.add_route('/event/create', EventCollectionResource(engine))
+api.add_route('/event/{User_ID}', EventResource(engine))
