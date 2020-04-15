@@ -10,6 +10,7 @@ requests                # Unit Testing request simulation
 sqlalchemy              # DB ORM handler.
 waitress                # Testing host service.
 pymysql                 # Python MySQL compiler.
+pillow                  # Python Image Handler.
 
 ######################
 REQUIRED ACTIONS

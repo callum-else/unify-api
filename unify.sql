@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS userpictures;
 DROP TABLE IF EXISTS userfriends;
+DROP TABLE IF EXISTS userfriendrequests;
 DROP TABLE IF EXISTS usertags;
 DROP TABLE IF EXISTS reportedusers;
 DROP TABLE IF EXISTS eventsusers;
@@ -40,10 +41,20 @@ CREATE TABLE `userfriends` (
   `User_ID` int NOT NULL,
   `Friend_ID` int NOT NULL,
   PRIMARY KEY (`User_ID`, `Friend_ID`),
-  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
-  FOREIGN KEY (`Friend_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
-  UNIQUE `Unique_Friendships` (`User_ID`, `Friend_ID`),
-  INDEX `User_ID` (`User_ID`)
+  CONSTRAINT fk_user_id FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
+  CONSTRAINT fk_friend_id FOREIGN KEY (`Friend_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
+  -- UNIQUE `Unique_Friendships` (`User_ID`, `Friend_ID`),
+  -- INDEX `User_ID` (`User_ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `userfriendrequests` (
+  `Reciever_ID` int NOT NULL,
+  `Sender_ID` int NOT NULL,
+  PRIMARY KEY (`Reciever_ID`, `Sender_ID`),
+  CONSTRAINT fk_reciever_id FOREIGN KEY (`Reciever_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE,
+  CONSTRAINT fk_sender_id FOREIGN KEY (`Sender_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
+  -- UNIQUE `Unique_Friendships` (`User_ID`, `Friend_ID`),
+  -- INDEX `User_ID` (`User_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `usertags` (
@@ -58,7 +69,7 @@ CREATE TABLE `events` (
   `User_ID` int NOT NULL,
   `Name` varchar(30) NOT NULL,
   `Description` text DEFAULT NULL,
-  `Picture` varchar(255) DEFAULT NULL,
+  `Picture_Path` varchar(255) DEFAULT NULL,
   `DateTime` datetime NOT NULL,
   `Location` varchar(255) NOT NULL,
   PRIMARY KEY (`Event_ID`)

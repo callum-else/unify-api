@@ -36,7 +36,8 @@ import re
 # Setup data for email sending api.
 post_url = "https://api.sendgrid.com/v3/mail/send"
 sender_email = "noreply@unifyapp.xyz"
-template_id = "d-56a8b2d3ff2a484da7e2ea6d3a074aab"
+verif_template_id = "d-56a8b2d3ff2a484da7e2ea6d3a074aab"
+password_template_id = "d-56a8b2d3ff2a484da7e2ea6d3a074aab"
 auth = "Bearer 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"
 
 # Generates a verification code string from 6 numbers.
@@ -68,7 +69,7 @@ def send_verification_email(email, username, code):
                     "code":code
                 }
             }],
-            "template_id":template_id
+            "template_id":verif_template_id
         },
         headers={
             'Authorization':auth, 
@@ -76,3 +77,38 @@ def send_verification_email(email, username, code):
         }
     )
     print(res)
+
+def send_change_password_email(email, username, code):
+    res = post(
+        post_url,
+        json={
+            "from": {"email":sender_email},
+            "personalizations":[{
+                "to":[{"email":email}],
+                "dynamic_template_data":{
+                    "email":email,
+                    "username":username,
+                    "code":code
+                }
+            }],
+            "template_id":password_template_id
+        },
+        headers={
+            'Authorization':auth, 
+            'Content-Type':'application/json'
+        }
+    )
+    print(res)
+
+######## IMAGE PROCESSING ########
+
+from os.path import join, exists
+
+uuid_format = '[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
+
+def validate_image_request(storage_path, file_name):
+    if re.search(uuid_format, file_name):
+        file_path = join(storage_path, file_name)
+        if exists(file_path):
+            return file_path
+    return None

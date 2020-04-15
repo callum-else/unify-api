@@ -12,7 +12,12 @@ from falcon_require_https import RequireHTTPS
 # Custom authentication backend.
 from .authentication import auth_backend
 from .db_init import engine, Session, user_loader
-from .resources import UserResource, UserCreationResource, UserLoginResource, UserVerificationResource, EventResource, EventCollectionResource
+from .resources import (
+    UserResource, UserCreationResource, UserFriendsResource, UserLoginResource, UserVerificationResource, 
+    EventResource, EventCreationResource, EventUsersResource, 
+    ReportUserResource, ReportEventResource,
+    ImageResource
+)
 
 # Falcon API initialisation, provided with Falcon middleware from imported modules.
 api = falcon.API(middleware=[
@@ -22,11 +27,20 @@ api = falcon.API(middleware=[
 ])
 
 # ============ User Routes ============
-api.add_route('/user/create', UserCreationResource(engine))
-api.add_route('/user/{User_ID}/verify', UserVerificationResource(engine))
-api.add_route('/user/{User_ID}', UserResource(engine))
 api.add_route('/login', UserLoginResource())
+api.add_route('/user/create', UserCreationResource(engine))
+api.add_route('/user/{User_ID}', UserResource(engine))
+api.add_route('/user/{User_ID}/friends', UserFriendsResource())
+api.add_route('/user/{User_ID}/verify', UserVerificationResource(engine))
 
 # ============ Event Routes ===========
-api.add_route('/event/create', EventCollectionResource(engine))
-api.add_route('/event/{User_ID}', EventResource(engine))
+api.add_route('/event/create', EventCreationResource(engine))
+api.add_route('/event/{Event_ID}', EventResource(engine))
+api.add_route('/event/{Event_ID}/users', EventUsersResource(engine))
+
+# ============ Image Routes ===========
+api.add_route('/images', ImageResource(r'C:\Users\cerle\Google Drive\_ University Work\Group Software Engineering\Project\unify-api\api\images\users'))
+
+# =========== Report Routes ===========
+api.add_route('/report/user/{Reported_User_ID}', ReportUserResource(engine))
+api.add_route('/report/event/{Reported_Event_ID}', ReportEventResource(engine))
