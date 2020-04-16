@@ -68,7 +68,9 @@ class UserFriendRequests(Base):
 class Events(Base):
     __tablename__ = 'events'
     __table_args__ = {'autoload':True, 'extend_existing':True}
-    attendees = relationship('EventUsers', cascade='all, delete-orphan')
+    
+    user_rels = relationship('EventUsers', cascade='all, delete-orphan')
+    attendees = association_proxy('user_rels', 'User_ID')
 
 class Users(Base):
     __tablename__ = 'users'
@@ -84,17 +86,17 @@ class Users(Base):
     event_rels = relationship('EventUsers', cascade='all, delete-orphan',  backref='event_users')
     events = association_proxy('event_rels', 'Event_ID')
 
-    requested_friend_rels = relationship('UserFriends', foreign_keys='UserFriends.User_ID', backref='requested_user', cascade='all, delete-orphan')
-    requested_friends = association_proxy('requested_friend_rels', 'Friend_ID')
+    requested_friend_rels = relationship('UserFriends', foreign_keys='UserFriends.Friend_ID', backref='requested_user', cascade='all, delete-orphan')
+    requested_friends = association_proxy('requested_friend_rels', 'User_ID')
 
-    recieved_friend_rels = relationship('UserFriends', foreign_keys='UserFriends.Friend_ID', backref='recieved_user', cascade='all, delete-orphan')
-    recieved_friends = association_proxy('recieved_friend_rels', 'User_ID')
+    recieved_friend_rels = relationship('UserFriends', foreign_keys='UserFriends.User_ID', backref='recieved_user', cascade='all, delete-orphan')
+    recieved_friends = association_proxy('recieved_friend_rels', 'Friend_ID')
 
     sent_request_rels = relationship('UserFriendRequests', foreign_keys='UserFriendRequests.Sender_ID', backref='sent_requests', cascade='all, delete-orphan')
-    sent_requests = association_proxy('sent_request_rels', 'Sent_ID')
+    sent_requests = association_proxy('sent_request_rels', 'Reciever_ID')
 
     recieved_request_rels = relationship('UserFriendRequests', foreign_keys='UserFriendRequests.Reciever_ID', backref='recieved_requests', cascade='all, delete-orphan')
-    recieved_requests = association_proxy('recieved_request_rels', 'Reciever_ID')
+    recieved_requests = association_proxy('recieved_request_rels', 'Sender_ID')
 
 ###########################################################
 

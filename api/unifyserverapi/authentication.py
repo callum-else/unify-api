@@ -37,7 +37,7 @@ import re
 post_url = "https://api.sendgrid.com/v3/mail/send"
 sender_email = "noreply@unifyapp.xyz"
 verif_template_id = "d-56a8b2d3ff2a484da7e2ea6d3a074aab"
-password_template_id = "d-56a8b2d3ff2a484da7e2ea6d3a074aab"
+password_template_id = "d-675d47f3ac8d4867870c1745c02757cb"
 auth = "Bearer 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"
 
 # Generates a verification code string from 6 numbers.

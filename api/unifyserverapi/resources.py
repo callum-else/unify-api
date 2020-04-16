@@ -3,7 +3,7 @@
 
 # Relative resource imports.
 from .db_init import (
-    Users, UserTags, UserFriends, UserFriendRequests,
+    Users, UserTags, UserPictures, UserFriends, UserFriendRequests,
     Events, EventUsers, 
     ReportedEvents, ReportedUsers,
     user_loader, Session
@@ -23,13 +23,14 @@ from falcon import (
 
 from json import load
 from jwt import decode
+from bcrypt import gensalt, hashpw, checkpw
 
 from sqlalchemy.exc import IntegrityError
 
 # Image processing resource.
 from mimetypes import guess_extension, guess_type
 from uuid import uuid4
-from os import makedirs
+from os import makedirs, remove
 from os.path import join, exists, getsize
 from io import open, BytesIO
 from PIL import Image
@@ -58,6 +59,22 @@ def get_user_rels(user):
         'friends':list(user.recieved_friends) + list(user.requested_friends)
     }
 
+# Template function for deleting items from a table.
+def delete(session, table_object, error_obj, **kwargs):
+        row = session.query(table_object).filter_by(**kwargs).scalar()
+
+        if row is not None:
+            session.delete(row)
+        else:
+            raise error_obj
+
+def can_perform_action(req, User_ID):
+    if req.context.user.User_ID is not User_ID:
+        raise HTTPUnauthorized(
+            'Cannot perform action.', 
+            'Calling user does not have permission to perform requested action.'
+        )
+
 user_responses = ['User_ID', 'First_Name', 'Last_Name', 'Twitter_Link', 'Instagram_Link', 'Spotify_Link', 'LinkedIn_Link', 'Description']
 
 # Single retrieval resource for editing, deleting and getting data from user profiles. 
@@ -66,7 +83,10 @@ class UserResource(SingleResource):
     response_fields = user_responses
 
     def before_patch(self, req, resp, db_session, resource, *args, **kwargs):
-        pass
+        can_perform_action(req, kwargs.get('User_ID'))
+    
+    def before_delete(self, req, resp, db_session, resource, *args, **kwargs):
+        can_perform_action(req, kwargs.get('User_ID'))
     
     def after_get(self, req, resp, item, *args, **kwargs):
         req.context['result']['data'].update(get_user_rels(item))
@@ -90,6 +110,7 @@ class UserCreationResource(CollectionResource):
         if check_valid_email(resource.Email):
             if db_session.query(Users).filter_by(Email=resource.Email).scalar() is None:
                 resource.Verification_Code = generate_verification_code()
+                resource.Password = hashpw(bytes(resource.Password, 'utf-8'), gensalt())
             else:
                 raise HTTPBadRequest(
                     "Email already exists", 
@@ -107,49 +128,97 @@ class UserCreationResource(CollectionResource):
         # JWT RETURNED TO USER for user request authentication.
         req.context['result']['access_token'] = auth_backend.get_auth_token({'User_ID':new.User_ID})
         req.context['result']['data'].update(get_user_rels(new))
-        
-class UserFriendsResource:
+
+class UserTagResource:
 
     def __init__(self):
         self._session_scope = session_scope
 
-    def on_get(self, req, resp, User_ID):
-        with self._session_scope() as db_session:
-            user = user_loader({'user':{'User_ID':int(User_ID)}})
-            req.context['result'] = {
-                'data': { 
-                    'friends': list(user.recieved_friends) + list(user.requested_friends)
-                }
-            }
+    def on_post(self, req, resp, User_ID):
+        if int(User_ID) is req.context.user.User_ID:
+            with self._session_scope() as db_session:
+                new_tags = []
+                if 'User_Tags' in req.context['doc']:
+                    for tag in req.context['doc']['User_Tags']:
+                        new_tags.append(
+                            UserTags(
+                                User_ID=req.context.user.User_ID,
+                                User_Tag=str(tag)
+                            )
+                        )
+                    db_session.add_all(new_tags)
+                else:
+                    # If data is missing, throw an error.
+                    raise HTTPBadRequest(
+                        "Information Invalid", 
+                        "Provided information is incomplete."
+                    )
+    
+    def on_delete(self, req, resp, User_ID):
+        if int(User_ID) is req.context.user.User_ID:
+            with self._session_scope() as db_session:
+                req_info = dict(load(req.bounded_stream))
+                if 'User_Tags' in req_info:
+                    for tag in req_info['User_Tags']:
+                        marked_tag = db_session.query(UserTags).filter_by(
+                            User_ID=req.context.user.User_ID,
+                            User_Tag=str(tag)
+                        ).scalar()
+                        if marked_tag is not None:
+                            db_session.delete(marked_tag)
+                else:
+                    # If data is missing, throw an error.
+                    raise HTTPBadRequest(
+                        "Information Invalid", 
+                        "Provided information is incomplete."
+                    )
+
+# Custom resource for creating, removing and accepting friend requests.
+class UserFriendRequestResource:
+
+    def __init__(self):
+        self._session_scope = session_scope
 
     def on_post(self, req, resp, User_ID):
-        with self._session_scope() as db_session:
-            reciever = user_loader({'user':{'User_ID':int(User_ID)}})
-            if reciever is not None:
-                if req.context.user.User_ID not in (list(reciever.sent_requests) + list(reciever.recieved_requests)): 
-                    request = UserFriendRequests(
-                        Reciever_ID=int(User_ID), 
-                        Sender_ID=req.context.user.User_ID
-                    )
-                    db_session.add(request)
-                    req.context['result'] = {
-                        'data': {
-                            'sender': req.context.user.User_ID,
-                            'reciever': int(User_ID)
-                        }
-                    }
+        if int(User_ID) is not req.context.user.User_ID:
+            with self._session_scope() as db_session:
+                reciever = user_loader({'user':{'User_ID':int(User_ID)}})
+                if reciever is not None:
+                    if req.context.user.User_ID not in (list(reciever.sent_requests) + list(reciever.recieved_requests)):
+                        if req.context.user.User_ID not in (list(reciever.requested_friends) + list(reciever.recieved_friends)):
+                            request = UserFriendRequests(
+                                Reciever_ID=int(User_ID), 
+                                Sender_ID=req.context.user.User_ID
+                            )
+                            db_session.add(request)
+                            req.context['result'] = {
+                                'data': {
+                                    'sender': req.context.user.User_ID,
+                                    'reciever': int(User_ID)
+                                }
+                            }
+                        else:
+                            raise HTTPConflict(
+                                'Friendship already exists',
+                                'A friendship already exists between the selected users.'
+                            )
+                    else:
+                        raise HTTPConflict(
+                            'Request already exists',
+                            'A friend request has already been sent between selected users.'
+                        )
                 else:
-                    raise HTTPConflict(
-                        'Request already exists',
-                        'A friend request has already been sent between selected users.'
+                    raise HTTPBadRequest(
+                        'User not found',
+                        'The requested user does not exist.'
                     )
-            else:
-                raise HTTPBadRequest(
-                    'User not found',
-                    'The requested user does not exist.'
-                )
-        
-        req.status = HTTP_200
+            
+            req.status = HTTP_200
+        else:
+            raise HTTPBadRequest(
+                'Cannot request self friendship.',
+                'A user cannot request a friendship with themselves.'
+            )
     
     def on_patch(self, req, resp, User_ID):
         with self._session_scope() as db_session:
@@ -178,7 +247,61 @@ class UserFriendsResource:
 
 
     def on_delete(self, req, resp, User_ID):
-        pass
+        with session_scope() as db_session:
+            delete(
+                db_session, 
+                UserFriendRequests, 
+                HTTPBadRequest(
+                    "Friend Request Not Found", 
+                    "Provided friend request has not been deleted as it could not be found."
+                ),
+                Sender_ID=req.context.user.User_ID,
+                Reciever_ID=User_ID
+            )
+
+        resp.status = HTTP_200
+        req.context['result'] = {}
+
+# Custom resource for getting and deleting friendships.
+class UserFriendsResource:
+
+    def __init__(self):
+        self._session_scope = session_scope
+
+    def on_get(self, req, resp, User_ID):
+        with self._session_scope() as db_session:
+            user = user_loader({'user':{'User_ID':int(User_ID)}})
+            req.context['result'] = {
+                'data': { 
+                    'friends': list(user.recieved_friends) + list(user.requested_friends)
+                }
+            }
+    
+    def on_delete(self, req, resp, User_ID):
+        with session_scope() as db_session:
+            Sender_ID = 0
+            Reciever_ID = 0
+
+            if User_ID in req.context.user.recieved_friends:
+                Sender_ID = User_ID
+                Reciever_ID = req.context.user.User_ID
+            else:
+                Sender_ID = req.context.user.User_ID
+                Reciever_ID = User_ID
+            
+            delete(
+                db_session, 
+                UserFriends, 
+                HTTPBadRequest(
+                    "Friendship Not Found", 
+                    "Provided friendship has not been deleted as it could not be found."
+                ),
+                User_ID=Reciever_ID,
+                Friend_ID=Sender_ID
+            )
+
+        resp.status = HTTP_200
+        req.context['result'] = {}
 
 # Custom built login resource.
 class UserLoginResource:
@@ -211,7 +334,12 @@ class UserLoginResource:
             user_info = dict(load(req.bounded_stream))
             if 'Email' in user_info and 'Password' in user_info and check_valid_email(user_info['Email']):
                 # SQLAlchemy session db query for returning a user object with input Email and Password, returns none if not found.
-                user = Session().query(Users).filter_by(Email=user_info['Email'], Password=user_info['Password']).scalar()
+                user_temp = Session().query(Users).filter_by(
+                    Email=user_info['Email']
+                ).scalar()
+                if user_temp is not None:
+                    if checkpw(bytes(user_info['Password'], 'utf-8'), bytes(user_temp.Password, 'utf-8')):
+                        user = user_temp
             else:
                 # If data is missing, throw an error.
                 raise HTTPBadRequest(
@@ -240,13 +368,16 @@ class UserVerificationResource(SingleResource):
     model = Users
     methods = ['PATCH']
 
+    # Information to return about the user.
+    response_fields = user_responses
+
     def before_patch(self, req, resp, db_session, resource, *args, **kwargs):
         # User is authenticated and provided in the request context.
         user = req.context.user.User_ID
 
         # Comparing the client-sent verif code with the saved user verif code.
         # Sets the user to verified if they are the same, raises a Falcon Bad Request if not.
-        if getattr(resource.Verification_Code) is not None:
+        if resource.Verification_Code is not None:
             if resource.Verification_Code == str(req.context.user.Verification_Code):
                 resource.User_Verified = True
             else:
@@ -260,6 +391,7 @@ class UserVerificationResource(SingleResource):
                 "No user verification code was sent, but it is required."
             )
 
+# Custom resource for processing, saving and returning images.
 class ImageResource:
 
     _accepted_image_types = [
@@ -269,10 +401,9 @@ class ImageResource:
 
     _max_image_size = (500, 500)
 
-    def __init__(self, image_path, chunk_size_bytes=4096):
-        
+    def __init__(self, image_path):
         self._image_path = image_path
-        self._chunk_size_bytes = chunk_size_bytes
+        self._session_scope = session_scope
 
     def on_get(self, req, resp):
         if 'user' in req.params and 'image' in req.params:
@@ -286,12 +417,36 @@ class ImageResource:
                 resp.content_type = guess_type(req.params['image'])[0]
             else:
                 raise HTTPNotFound(
-                    "Image Not Found", 
-                    "Requested image does not exist at destination: /images/{user}/{image_name}".format(
-                        user=req.params['user'], 
-                        image_name=req.params['image']
-                    )
+                    title="Image Not Found", 
+                    description="Requested image does not exist."
                 )
+        else:
+            raise HTTPBadRequest(
+                "Malformed Request", 
+                "'user' and 'image' parameter not specified in request."
+            )
+
+    def on_delete(self, req, resp):
+        if 'User_ID' in req.params and 'Picture_Path' in req.params:
+            if int(req.params['User_ID']) is req.context.user.User_ID:
+                with self._session_scope() as db_session:
+                    image_path = validate_image_request(
+                        join(self._image_path, req.params['User_ID']), 
+                        req.params['Picture_Path']
+                    )
+                    if image_path is not None:
+                        remove(image_path)
+                        request = db_session.query(UserPictures).filter_by(
+                            User_ID=req.params['User_ID'], 
+                            Picture_Path=req.params['Picture_Path']
+                        ).scalar()
+                        if request is not None:
+                            db_session.delete(request)
+                    else:
+                        raise HTTPNotFound(
+                            title="Image Not Found", 
+                            description="Requested image does not exist."
+                        )
         else:
             raise HTTPBadRequest(
                 "Malformed Request", 
@@ -314,6 +469,13 @@ class ImageResource:
         image_obj.save(image_path, 'JPEG', optimize=True, quality=80)
         image_obj.close()
         
+        with self._session_scope() as db_session:
+            user_image = UserPictures(
+                User_ID=req.context.user.User_ID,
+                Picture_Path=file_name
+            )
+            db_session.add(user_image)
+
         resp.status = HTTP_201
         req.context['result'] = {
             'data': {
@@ -349,6 +511,38 @@ class ImageResource:
 class EventResource(SingleResource):
     model = Events
 
+    def before_patch(self, req, resp, db_session, resource, *args, **kwargs):
+        can_perform_action(req, resource.User_ID)
+    
+    def before_delete(self, req, resp, db_session, resource, *args, **kwargs):
+        can_perform_action(req, resource.User_ID)
+
+# Resource for getting a user's feed.
+class EventFeedResource():
+    model = Events
+    methods = ['GET']
+
+    def __init__(self):
+        self._session_scope = session_scope
+
+    # Limit & Offset
+    def on_get(self, req, resp):
+        with self._session_scope() as db_session:
+            friends = set(
+                list(req.context.user.recieved_friends) + 
+                list(req.context.user.requested_friends)
+            )
+            
+            db_session.query(Events).filter(
+                Events.Event_ID.in_(
+                    set(
+                        db_session.query(EventUsers).filter(
+                            EventUsers.User_ID.in_(friends)
+                        ).all()
+                    )
+                )
+            ).all()
+
 # Event resource for uploading and editing resources.
 class EventCreationResource(CollectionResource):
     model = Events
@@ -362,6 +556,7 @@ class EventCreationResource(CollectionResource):
             event_user = EventUsers(Event_ID=new.Event_ID, User_ID=new.User_ID)
             db_session.add(event_user)
 
+# Resource for registering interest in events.
 class EventUsersResource(CollectionResource):
     model = EventUsers
     methods = ['POST', 'GET']
@@ -385,8 +580,10 @@ class EventUsersResource(CollectionResource):
         resp.status = HTTP_200
         req.context['result'] = {}
 
+# Resource for reporting users for review.
 class ReportUserResource(CollectionResource):
     model = ReportedUsers
+    methods = ['POST']
 
     def before_post(self, req, resp, db_session, resource, *args, **kwargs):
         resource.Reporting_User_ID = req.context.user.User_ID
@@ -418,8 +615,10 @@ class ReportUserResource(CollectionResource):
         resp.status = HTTP_200
         req.context['result'] = {}
 
+# Resource for reporting events for review.
 class ReportEventResource(CollectionResource):
     model = ReportedEvents
+    methods = ['POST']
 
     def before_post(self, req, resp, db_session, resource, *args, **kwargs):
         resource.Reporting_User_ID = req.context.user.User_ID
@@ -451,11 +650,3 @@ class ReportEventResource(CollectionResource):
         
         resp.status = HTTP_200
         req.context['result'] = {}
-
-def delete(session, table_object, error_obj, **kwargs):
-        row = session.query(table_object).filter_by(**kwargs).scalar()
-
-        if row is not None:
-            session.delete(row)
-        else:
-            raise error_obj

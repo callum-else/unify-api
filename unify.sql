@@ -1,3 +1,6 @@
+-- STOP ALL INSTANCES OF THE SERVERSIDE BACKEND 
+-- BEFORE APPLYING THIS SQL TO THE DATABASE.
+
 DROP TABLE IF EXISTS userpictures;
 DROP TABLE IF EXISTS userfriends;
 DROP TABLE IF EXISTS userfriendrequests;
@@ -72,6 +75,7 @@ CREATE TABLE `events` (
   `Picture_Path` varchar(255) DEFAULT NULL,
   `DateTime` datetime NOT NULL,
   `Location` varchar(255) NOT NULL,
+  `Event_Created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`Event_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

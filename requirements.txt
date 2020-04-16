@@ -6,11 +6,13 @@ falcon-auth             # Falcon user authentication middleware
 falcon-autocrud         # Falcon CRUD DB interaction handler using SQLAlchemy
 falcon-require-https    # Falcon HTTPS validator
 pem                     # Importing PEM certificates
+pillow                  # Python Image Handler.
+pymysql                 # Python MySQL compiler.
 requests                # Unit Testing request simulation
 sqlalchemy              # DB ORM handler.
 waitress                # Testing host service.
-pymysql                 # Python MySQL compiler.
-pillow                  # Python Image Handler.
+
+
 
 ######################
 REQUIRED ACTIONS
@@ -20,26 +22,3 @@ falcon_autocrud is broken, requires an edit to middleware.py, change:
     process_response(self, req, resp, resource)
 to:
     process_response(self, req, resp, resource, req_succeeded)
-
-######################
-VIRTUAL ENVIRONMENT SETUP
-######################
-
-To use the virtual environment:
-    - Open the VSCode terminal.
-    - Type the command: 
-        Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-    - In the Explorer, at the left side of the window, navigate to api/.venv/Scripts/activate.ps1
-    - Right click, Copy Path.
-    - In the VSCode terminal, type:
-        & "<Paste_The_Path>"
-
-If all goes well, you will see (.venv) before the current directory.
-To close the virtual environment, simply close the terminal instance.
-
-######################
-REQUIRED ROUTE DATA
-######################
-
-/user/? GET:
-    - 
