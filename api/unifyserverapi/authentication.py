@@ -76,7 +76,6 @@ def send_verification_email(email, username, code):
             'Content-Type':'application/json'
         }
     )
-    print(res)
 
 def send_change_password_email(email, username, code):
     res = post(
@@ -98,7 +97,6 @@ def send_change_password_email(email, username, code):
             'Content-Type':'application/json'
         }
     )
-    print(res)
 
 ######## IMAGE PROCESSING ########
 

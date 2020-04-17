@@ -21,9 +21,10 @@ from falcon import (
     HTTP_201, HTTP_200
 )
 
-from json import load
+from json import load, loads
 from jwt import decode
 from bcrypt import gensalt, hashpw, checkpw
+from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
@@ -69,7 +70,7 @@ def delete(session, table_object, error_obj, **kwargs):
             raise error_obj
 
 def can_perform_action(req, User_ID):
-    if req.context.user.User_ID is not User_ID:
+    if req.context.user.User_ID is not int(User_ID):
         raise HTTPUnauthorized(
             'Cannot perform action.', 
             'Calling user does not have permission to perform requested action.'
@@ -525,7 +526,6 @@ class EventFeedResource():
     def __init__(self):
         self._session_scope = session_scope
 
-    # Limit & Offset
     def on_get(self, req, resp):
         with self._session_scope() as db_session:
             friends = set(
@@ -533,15 +533,49 @@ class EventFeedResource():
                 list(req.context.user.requested_friends)
             )
             
-            db_session.query(Events).filter(
-                Events.Event_ID.in_(
-                    set(
-                        db_session.query(EventUsers).filter(
-                            EventUsers.User_ID.in_(friends)
-                        ).all()
-                    )
-                )
-            ).all()
+            friend_events = set(
+                [
+                    event for event, in db_session.query(
+                        EventUsers.Event_ID
+                    ).filter(
+                        EventUsers.User_ID.in_(friends)
+                    ).all()
+                ]
+            )
+            
+            offset = req.params['offset'] if 'offset' in req.params else 0
+            limit = req.params['limit'] if 'limit' in req.params else 20
+            
+            event_objects = db_session.query(Events).filter(
+                Events.Event_ID.in_(friend_events)
+            ).order_by(Events.Event_Created).offset(offset).limit(limit).all()
+
+            output_json = []
+            for event_obj in event_objects:
+                ev_json = {'Attendees':[], 'User':[]}
+                
+                for attribute in [
+                    'Event_ID', 'Name', 'Description', 
+                    'Picture_Path', 'DateTime', 'Location'
+                ]:
+                    ev_json[attribute] = getattr(event_obj, attribute)
+                    if isinstance(ev_json[attribute], datetime):
+                        ev_json[attribute] = ev_json[attribute].strftime('%Y-%m-%dT%H:%M:%SZ')
+                
+                for user in event_obj.attendees:
+                    user_obj = db_session.query(Users).filter_by(User_ID=user).scalar()
+                    storage_dir = 'Attendees' if user is not event_obj.User_ID else 'User'
+                    ev_json[storage_dir].append({
+                        'User_ID': user_obj.User_ID,
+                        'First_Name': user_obj.First_Name,
+                        'Last_Name': user_obj.Last_Name
+                    })
+
+                output_json.append(ev_json)
+
+            req.context['result'] = {
+                'data':output_json
+            }
 
 # Event resource for uploading and editing resources.
 class EventCreationResource(CollectionResource):
