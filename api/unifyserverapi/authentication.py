@@ -10,7 +10,7 @@ from time import time
 
 # Reading the private key from the certificate file.
 p_key = str(
-    parse_file("C:\\Users\\cerle\\Google Drive\\_ University Work\\Group Software Engineering\\Project\\unify-api\\privkey.pem")[0]
+    parse_file("<path-to-private-key>")[0]
 )
 
 # Creating the authentication backend needed for Falcon-Auth.

@@ -11,7 +11,7 @@ from os.path import dirname, join
 
 data_gen = Faker(['en_GB'])
 
-test_url="http://DESKTOP-JITKUGS:8000"
+test_url="https://api.unifyapp.xyz"
 
 routes = {
     'create_user':  '/user/create',

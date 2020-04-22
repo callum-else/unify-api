@@ -1,6 +1,7 @@
 ######################
 NEEDED LIBS:
 ######################
+bcrypt                  # Password hashing, salting and checking.
 falcon                  # Core Web API
 falcon-auth             # Falcon user authentication middleware
 falcon-autocrud         # Falcon CRUD DB interaction handler using SQLAlchemy

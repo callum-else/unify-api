@@ -5,13 +5,7 @@ from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy import create_engine, UniqueConstraint, Table, Column, String, Integer, ForeignKey
 
-db_settings = {
-    'host':'localhost',
-    'port':3306,
-    'user':'unify',
-    'password':'V8oU!LkuYz',
-    'db':'unify'
-}
+from .db_settings import db_settings
 
 # Setup for the SQLAlchemy DB Engine, handles DB connection.
 engine = create_engine(
