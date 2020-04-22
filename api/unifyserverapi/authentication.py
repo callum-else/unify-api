@@ -98,14 +98,16 @@ def send_change_password_email(email, username, code):
         }
     )
 
+    print(res.status_code)
+
 ######## IMAGE PROCESSING ########
 
 from os.path import join, exists
 
 uuid_format = '[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
 
-def validate_image_request(storage_path, file_name):
-    if re.search(uuid_format, file_name):
+def validate_image_request(storage_path, file_name, ignore_check=False):
+    if ignore_check or re.search(uuid_format, file_name):
         file_path = join(storage_path, file_name)
         if exists(file_path):
             return file_path

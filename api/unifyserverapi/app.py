@@ -14,7 +14,8 @@ from .authentication import auth_backend
 from .db_init import engine, Session, user_loader
 from .resources import (
     UserResource, UserCreationResource, UserLoginResource, UserVerificationResource, 
-    UserFriendsResource, UserFriendRequestResource,
+    UserChangePasswordResource,
+    UserFriendsResource, UserFriendRequestResource, UserFriendMatchResource,
     UserTagResource,
     EventResource, EventFeedResource, EventCreationResource, EventUsersResource, 
     ReportUserResource, ReportEventResource,
@@ -31,12 +32,14 @@ api = falcon.API(middleware=[
 # ============ User Routes ============
 api.add_route('/login', UserLoginResource())
 api.add_route('/user/create', UserCreationResource(engine))
+api.add_route('/user/password/change', UserChangePasswordResource())
 api.add_route('/user/{User_ID}', UserResource(engine))
 api.add_route('/user/{User_ID}/tags', UserTagResource())
 api.add_route('/user/{User_ID}/friends', UserFriendsResource())
 api.add_route('/user/{User_ID}/friends/requests', UserFriendRequestResource())
 api.add_route('/user/{User_ID}/verify', UserVerificationResource(engine))
 api.add_route('/feed', EventFeedResource())
+api.add_route('/matches', UserFriendMatchResource())
 
 # ============ Event Routes ===========
 api.add_route('/event/create', EventCreationResource(engine))

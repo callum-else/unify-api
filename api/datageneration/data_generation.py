@@ -35,20 +35,30 @@ def get_request_headers(token, content_type):
 created_users = []
 created_events = []
 
-def create_test_user():
+def create_test_user(tags):
     name = data_gen.name().split()
     First_Name, Last_Name = name if len(name) == 2 else name[1:3]
     Email = '{l_name}.{f_letter}@university.ac.uk'.format(l_name=Last_Name.lower(), f_letter=First_Name[0].lower())
     DateOfBirth = str(data_gen.date_of_birth(minimum_age=18, maximum_age=21))
     Password = data_gen.password()
+    User_Tags = []
+    for i in range(randint(6, 12)):
+        tag = { 'User_Tag': tags[randint(0, len(tags)-1)] }
+        if tag not in User_Tags:
+            User_Tags.append(tag)
+
     user_info = {
         'Email':Email,
         'Password':Password,
         'First_Name':First_Name,
         'Last_Name':Last_Name,
         'DateOfBirth':DateOfBirth,
+        'tag_rels':User_Tags
     }
+    
     req = requests.post(test_url + routes['create_user'], json=user_info)
+
+    output = ''
     if req.status_code >= 200 and req.status_code <= 203:
         created_users.append({
             'User_ID':req.json()['data']['User_ID'],
@@ -57,21 +67,19 @@ def create_test_user():
             'Auth_Token':req.json()['access_token'],
             'Friends':[]
         })
-        print(
-            'User Created: UID-{user}, {f_name} {l_name}.'.format(
-                user=req.json()['data']['User_ID'],
-                f_name=First_Name,
-                l_name=Last_Name
-            )
+
+        output = 'User Created: UID-{user}, {f_name} {l_name}.'.format(
+            user=req.json()['data']['User_ID'],
+            f_name=First_Name,
+            l_name=Last_Name
         )
+
     else:
-        print(
-            'Failed to create user: UID-{user}, {msg}.'.format(
-                user=req.json()['data']['User_ID'],
-                msg=req.reason
-            )
+        output = 'Failed to create user: {msg}.'.format(
+            msg=req.text
         )
     req.close()
+    return output
 
 def create_test_event():
     Name = data_gen.sentence(4)
@@ -92,26 +100,24 @@ def create_test_event():
             content_types['json']
         ) 
     )
+    output = ''
     if req.status_code >= 200 and req.status_code <= 203:
         created_events.append({
             'Event_ID':req.json()['data']['Event_ID'],
             'User_ID':req.json()['data']['User_ID'],
             'Users':[]
         })
-        print(
-            'Event Created: EID-{event} created by UID-{user}.'.format(
-                event=req.json()['data']['Event_ID'],
-                user=req.json()['data']['User_ID']
-            )
+        
+        output = 'Event Created: EID-{event} created by UID-{user}.'.format(
+            event=req.json()['data']['Event_ID'],
+            user=req.json()['data']['User_ID']
         )
     else:
-        print(
-            'Failed to create event: EID-{event}, {msg}.'.format(
-                event=req.json()['data']['Event_ID'],
-                msg=req.reason
-            )
+        output = 'Failed to create event: {msg}.'.format(
+            msg=req.text
         )
     req.close()
+    return output
     
 def create_friendship():
     Sender_Index = randint(0,len(created_users)-1)
@@ -125,6 +131,7 @@ def create_friendship():
             content_types['json']
         )
     )
+    output = ''
     if req.status_code >= 200 and req.status_code <= 203:
         resp = requests.patch(
             test_url + routes['add_friend'].format(User_ID=created_users[Sender_Index]['User_ID']),
@@ -137,30 +144,25 @@ def create_friendship():
         if resp.status_code >= 200 and req.status_code <= 203:
             created_users[Sender_Index]['Friends'].append(created_users[Reciever_Index]['User_ID'])
             created_users[Reciever_Index]['Friends'].append(created_users[Sender_Index]['User_ID'])
-            print(
-                'Friendship Created: UID-{sender} and UID-{reciever}.'.format(
-                    sender=created_users[Sender_Index]['User_ID'],
-                    reciever=created_users[Reciever_Index]['User_ID']
-                )
+            output = 'Friendship Created: UID-{sender} and UID-{reciever}.'.format(
+                sender=created_users[Sender_Index]['User_ID'],
+                reciever=created_users[Reciever_Index]['User_ID']
             )
         else:
-            print(
-                'Failed to accept request: UID-{reciever} and UID-{sender}, {msg}.'.format(
-                    reciever=created_users[Reciever_Index]['User_ID'],
-                    sender=created_users[Sender_Index]['User_ID'],
-                    msg=req.reason
-                )
-            )
-        resp.close()
-    else:
-        print(
-            'Failed to send friend request: UID-{sender} and UID-{reciever}, {msg}.'.format(
+            output = 'Failed to accept request: UID-{reciever} and UID-{sender}, {msg}.'.format(
                 reciever=created_users[Reciever_Index]['User_ID'],
                 sender=created_users[Sender_Index]['User_ID'],
                 msg=req.reason
             )
+        resp.close()
+    else:
+        output = 'Failed to send friend request: UID-{sender} and UID-{reciever}, {msg}.'.format(
+            reciever=created_users[Reciever_Index]['User_ID'],
+            sender=created_users[Sender_Index]['User_ID'],
+            msg=req.reason
         )
     req.close()
+    return output
 
 def create_user_attendence():
     User_Index = randint(0,len(created_users)-1)
@@ -174,36 +176,53 @@ def create_user_attendence():
             content_types['json']
         )
     )
+    output = ''
     if req.status_code >= 200 and req.status_code <= 203:
         created_events[Event_Index]['Users'].append(User_Index)
-        print(
-            'User Attendance Created: UID-{user} attending EID-{event}.'.format(
-                user=created_users[User_Index]['User_ID'],
-                event=created_events[Event_Index]['Event_ID']
-            )
+        output = 'User Attendance Created: UID-{user} attending EID-{event}.'.format(
+            user=created_users[User_Index]['User_ID'],
+            event=created_events[Event_Index]['Event_ID']
         )
     else:
-        print(
-            'Failed to request attendence: UID-{user} attending EID-{event}, {msg}.'.format(
-                user=created_users[User_Index]['User_ID'],
-                event=created_events[Event_Index]['Event_ID'],
-                msg=req.reason
-            )
+        output = 'Failed to request attendence: UID-{user} attending EID-{event}, {msg}.'.format(
+            user=created_users[User_Index]['User_ID'],
+            event=created_events[Event_Index]['Event_ID'],
+            msg=req.reason
         )
     req.close()
+    return output
 
-def generate_data(user_num=30, event_num=25, relationship_modifier=3):
-    for i in range(user_num):
-        create_test_user()
+def generate_data(user_num=30, tag_num=10, event_num=25, relationship_modifier=3):
     
-    for i in range(user_num * relationship_modifier):
-        create_friendship()
+    mod_range = user_num * relationship_modifier
+
+    for i in range(user_num):
+        print('({i}/{total}) {result}'.format(
+            i=i,
+            total=user_num,
+            result=create_test_user(data_gen.words(tag_num, unique=True))
+        ))
+    
+    for i in range(mod_range):
+        print('({i}/{total}) {result}'.format(
+            i=i,
+            total=mod_range,
+            result=create_friendship()
+        ))
 
     for i in range(event_num):
-        create_test_event()
+        print('({i}/{total}) {result}'.format(
+            i=i,
+            total=event_num,
+            result=create_test_event()
+        ))
 
-    for i in range(user_num * relationship_modifier):
-        create_user_attendence()
+    for i in range(mod_range):
+        print('({i}/{total}) {result}'.format(
+            i=i,
+            total=mod_range,
+            result=create_user_attendence()
+        ))
 
     file_path = join(join(getcwd(), dirname(__file__)), 'generated_data.json')
     with open(file_path, 'w+') as output:

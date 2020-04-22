@@ -76,7 +76,8 @@ CREATE TABLE `events` (
   `DateTime` datetime NOT NULL,
   `Location` varchar(255) NOT NULL,
   `Event_Created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`Event_ID`)
+  PRIMARY KEY (`Event_ID`),
+  FOREIGN KEY (`User_ID`) REFERENCES `users` (`User_ID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `eventsusers` (

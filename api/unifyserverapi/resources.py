@@ -11,6 +11,7 @@ from .db_init import (
 from .authentication import (
     auth_backend, 
     generate_verification_code, send_verification_email, check_valid_email, 
+    send_change_password_email,
     validate_image_request
 )
 
@@ -130,6 +131,70 @@ class UserCreationResource(CollectionResource):
         req.context['result']['access_token'] = auth_backend.get_auth_token({'User_ID':new.User_ID})
         req.context['result']['data'].update(get_user_rels(new))
 
+class UserChangePasswordResource:
+
+    def on_get(self, req, resp):
+        with session_scope() as db_session:
+            req.context.user.Password_Code = generate_verification_code()
+            send_change_password_email(
+                req.context.user.Email,
+                req.context.user.First_Name,
+                req.context.user.Password_Code
+            )
+            db_session.query(Users).filter_by(User_ID=req.context.user.User_ID).update(
+                { Users.Password_Code : req.context.user.Password_Code }
+            )
+        req.status = HTTP_201
+        req.context['result'] = {
+            'data': { 'sent': True }
+        }
+    
+    def on_patch(self, req, resp):
+        with session_scope() as db_session:
+            if 'Password_Code' in req.context['doc']:
+                if req.context['doc']['Password_Code'] == req.context.user.Password_Code:
+                    db_session.query(Users).filter_by(User_ID=req.context.user.User_ID).update(
+                        { Users.Password_Changed : True }
+                    )
+                else:
+                    raise HTTPBadRequest(
+                        'Code Incorrect',
+                        'The provided verification code is incorrect.'
+                    )
+            else:
+                raise HTTPBadRequest(
+                    'Code not provided',
+                    'The required verifcation code has not been provided.'
+                )
+        req.context['result'] = {
+            'data': { 'change_allowed': True }
+        }
+    
+    def on_post(self, req, resp):
+        with session_scope() as db_session:
+            if 'Password' in req.context['doc']:
+                if req.context.user.Password_Changed == True:
+                    db_session.query(Users).filter_by(User_ID=req.context.user.User_ID).update({ 
+                        Users.Password_Changed : False,
+                        Users.Password : hashpw(
+                            bytes(req.context['doc']['Password'], 'utf-8'), 
+                            gensalt()
+                        )
+                    })
+                    req.context['result'] = {
+                        'data': { 'changed_password': True }
+                    }
+                else:
+                    raise HTTPUnauthorized(
+                        'Cannot perform action',
+                        'Password cannot be changed as change has not been verified.'
+                    )
+            else:
+                raise HTTPBadRequest(
+                    'Password not given',
+                    'New Password was not provided.'
+                )
+
 class UserTagResource:
 
     def __init__(self):
@@ -141,19 +206,26 @@ class UserTagResource:
                 new_tags = []
                 if 'User_Tags' in req.context['doc']:
                     for tag in req.context['doc']['User_Tags']:
-                        new_tags.append(
-                            UserTags(
-                                User_ID=req.context.user.User_ID,
-                                User_Tag=str(tag)
+                        if tag not in req.context.user.tags:
+                            new_tags.append(
+                                UserTags(
+                                    User_ID=req.context.user.User_ID,
+                                    User_Tag=str(tag)
+                                )
                             )
-                        )
                     db_session.add_all(new_tags)
+                    req.context['result'] = {
+                        'data': {
+                            'tags': req.context['doc']['User_Tags']
+                        }
+                    }
                 else:
                     # If data is missing, throw an error.
                     raise HTTPBadRequest(
                         "Information Invalid", 
                         "Provided information is incomplete."
                     )
+
     
     def on_delete(self, req, resp, User_ID):
         if int(User_ID) is req.context.user.User_ID:
@@ -179,6 +251,29 @@ class UserFriendRequestResource:
 
     def __init__(self):
         self._session_scope = session_scope
+
+    def on_get(self, req, resp, User_ID):
+        with self._session_scope() as db_session:
+            user = user_loader({'user':{'User_ID':int(User_ID)}})
+            
+            output = []
+            friend_objects = db_session.query(Users).filter(
+                Users.User_ID.in_(
+                    list(user.recieved_requests)
+                )
+            )
+
+            for friend in friend_objects:
+                output.append({
+                    'User_ID' : friend.User_ID,
+                    'First_Name': friend.First_Name,
+                    'Last_Name': friend.Last_Name,
+                    'Picture_Path': friend.pictures[0] if len(friend.pictures) >= 1 else '',
+                })
+
+            req.context['result'] = {
+                'data': output 
+            }
 
     def on_post(self, req, resp, User_ID):
         if int(User_ID) is not req.context.user.User_ID:
@@ -272,10 +367,24 @@ class UserFriendsResource:
     def on_get(self, req, resp, User_ID):
         with self._session_scope() as db_session:
             user = user_loader({'user':{'User_ID':int(User_ID)}})
+            
+            output = []
+            friend_objects = db_session.query(Users).filter(
+                Users.User_ID.in_(
+                    list(user.requested_friends) + list(user.recieved_friends)
+                )
+            )
+
+            for friend in friend_objects:
+                output.append({
+                    'User_ID' : friend.User_ID,
+                    'First_Name': friend.First_Name,
+                    'Last_Name': friend.Last_Name,
+                    'Picture_Path': friend.pictures[0] if len(friend.pictures) >= 1 else '',
+                })
+
             req.context['result'] = {
-                'data': { 
-                    'friends': list(user.recieved_friends) + list(user.requested_friends)
-                }
+                'data': output 
             }
     
     def on_delete(self, req, resp, User_ID):
@@ -303,6 +412,50 @@ class UserFriendsResource:
 
         resp.status = HTTP_200
         req.context['result'] = {}
+
+class UserFriendMatchResource:
+
+    def on_get(self, req, resp):
+        
+        with session_scope() as db_session:
+            this_tags = set(req.context.user.tags)
+            this_requests = set(list(req.context.user.sent_requests) + list(req.context.user.recieved_requests))
+
+            matches = set(
+                [
+                    match for match, in db_session.query(
+                        UserTags.User_ID
+                    ).filter(
+                        UserTags.User_Tag.in_(this_tags)
+                    ).all()
+                ]
+            )
+
+            user_objects = db_session.query(Users).filter(
+                Users.User_ID.in_(matches)
+            )
+
+            output = []
+            for user in user_objects:
+                if user.User_ID is not req.context.user.User_ID:
+                    if user.User_ID not in this_requests:
+                        tag_matches = list(set(user.tags) & this_tags)
+                        output.append({
+                            'User_ID':user.User_ID,
+                            'First_Name':user.First_Name,
+                            'Last_Name': user.Last_Name,
+                            'Match_Num': len(tag_matches),
+                            'Matches': tag_matches,
+                            'Picture_Path': user.pictures[0] if len(user.pictures) >= 1 else ''
+                        })
+            
+            output = sorted(output, key=lambda i: i['Match_Num'], reverse=True)
+
+            req.context['result'] = {
+                'data': output
+            }
+
+            #db_session.query(UserTags).filter(Users.tags.any(req.context.user.tags)).all()
 
 # Custom built login resource.
 class UserLoginResource:
@@ -400,6 +553,10 @@ class ImageResource:
         'image/png'
     ]
 
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
     _max_image_size = (500, 500)
 
     def __init__(self, image_path):
@@ -410,7 +567,8 @@ class ImageResource:
         if 'user' in req.params and 'image' in req.params:
             image_path = validate_image_request(
                 join(self._image_path, req.params['user']), 
-                req.params['image']
+                req.params['image'],
+                ignore_check = (req.params['user'] == 'default')
             )
             if image_path is not None:
                 resp.stream = open(image_path, 'rb')
@@ -465,17 +623,22 @@ class ImageResource:
         file_name = '{id}.jpg'.format(id=uuid4())
         image_path = join(image_folder, file_name)
 
-        image_obj = self.format_image(Image.open(req.stream), req.get_param_as_list('crop_boundary', transform=int))
-
+        image_obj = self.format_image(
+            Image.open(req.stream), 
+            req.get_param_as_list('crop_boundary', transform=int)
+        )
+        
         image_obj.save(image_path, 'JPEG', optimize=True, quality=80)
         image_obj.close()
         
-        with self._session_scope() as db_session:
-            user_image = UserPictures(
-                User_ID=req.context.user.User_ID,
-                Picture_Path=file_name
-            )
-            db_session.add(user_image)
+        if 'assign_user' in req.params and bool(req.params['assign_user']) is True:
+            with self._session_scope() as db_session:
+                user_image = UserPictures(
+                    User_ID=req.context.user.User_ID,
+                    Picture_Path=file_name
+                )
+                db_session.add(user_image)
+                print('Image added to user: ' + str(req.context.user.User_ID))
 
         resp.status = HTTP_201
         req.context['result'] = {
@@ -512,6 +675,27 @@ class ImageResource:
 class EventResource(SingleResource):
     model = Events
 
+    def after_get(self, req, resp, item, *args, **kwargs):
+        with session_scope() as db_session:
+            attendees = []
+            for user in item.attendees:
+                user_obj = db_session.query(Users).filter_by(User_ID=user).scalar()
+                attendees.append({
+                    'User_ID': user_obj.User_ID,
+                    'First_Name': user_obj.First_Name,
+                    'Last_Name': user_obj.Last_Name
+                })
+            
+            event_creator = db_session.query(Users).filter_by(User_ID=item.User_ID).scalar()
+            
+            req.context['result']['data']['Attendees'] = attendees
+            req.context['result']['data']['Creator'] = {
+                'User_ID': event_creator.User_ID,
+                'First_Name': event_creator.First_Name,
+                'Last_Name': event_creator.Last_Name
+            }
+            
+
     def before_patch(self, req, resp, db_session, resource, *args, **kwargs):
         can_perform_action(req, resource.User_ID)
     
@@ -530,7 +714,8 @@ class EventFeedResource():
         with self._session_scope() as db_session:
             friends = set(
                 list(req.context.user.recieved_friends) + 
-                list(req.context.user.requested_friends)
+                list(req.context.user.requested_friends) +
+                [ req.context.user.User_ID ]
             )
             
             friend_events = set(
@@ -552,24 +737,16 @@ class EventFeedResource():
 
             output_json = []
             for event_obj in event_objects:
-                ev_json = {'Attendees':[], 'User':[]}
+                ev_json = {}
                 
                 for attribute in [
-                    'Event_ID', 'Name', 'Description', 
-                    'Picture_Path', 'DateTime', 'Location'
+                    'Event_ID', 'Name', 'Picture_Path',
                 ]:
                     ev_json[attribute] = getattr(event_obj, attribute)
                     if isinstance(ev_json[attribute], datetime):
                         ev_json[attribute] = ev_json[attribute].strftime('%Y-%m-%dT%H:%M:%SZ')
-                
-                for user in event_obj.attendees:
-                    user_obj = db_session.query(Users).filter_by(User_ID=user).scalar()
-                    storage_dir = 'Attendees' if user is not event_obj.User_ID else 'User'
-                    ev_json[storage_dir].append({
-                        'User_ID': user_obj.User_ID,
-                        'First_Name': user_obj.First_Name,
-                        'Last_Name': user_obj.Last_Name
-                    })
+               
+                ev_json['Attendees'] = str(len(event_obj.attendees))
 
                 output_json.append(ev_json)
 
@@ -580,7 +757,7 @@ class EventFeedResource():
 # Event resource for uploading and editing resources.
 class EventCreationResource(CollectionResource):
     model = Events
-    methods = ['POST', 'PATCH']
+    methods = ['POST']
 
     def before_post(self, req, resp, db_session, resource, *args, **kwargs):
         resource.User_ID = req.context.user.User_ID
@@ -597,6 +774,9 @@ class EventUsersResource(CollectionResource):
 
     def before_post(self, req, resp, db_session, resource, *args, **kwargs):
         resource.User_ID = req.context.user.User_ID
+
+        if 'Event_ID' in kwargs and int(kwargs['Event_ID']) in req.context.user.events:
+            raise HTTPConflict('Already attending.', 'Event attendance already Registered.')
 
     def on_delete(self, req, resp, Event_ID):
         with session_scope() as db_session:
